@@ -90,25 +90,137 @@ class Interpolator1D(ABC):
 
 class Interpolator1DPCP(Interpolator1D):
 
-    def __init__(self, axis1: np.ndarray, values: np.ndarray, extrpolation_method: ExtrapMethod) -> None:
+    def __init__(
+            self, 
+            axis1: np.ndarray, 
+            values: np.ndarray, 
+            extrpolation_method: ExtrapMethod) -> None:
         super().__init__(axis1, values, InterpMethod.LINEAR, extrpolation_method)
         assert self.extrap_method_ == ExtrapMethod.FLAT
 
     def interpolate(self, x: float) -> float:
         ### TODO
-        pass
+        axis = self.axis1_
+        values = self.values_
+        n = self.length_
+
+        if x < axis[0]:
+            return float(values[0])
+        
+        for i in range(n - 1):
+            if axis[i] <= x < axis[i + 1]:
+                return float(values[i + 1])
+            
+        return float(values[n - 1])
+
     
-    def gradient_wrt_ordinate(self, x : float):
-        ### TODO
-        pass
+
 
     def integrate(self, start_x : float, end_x : float):
         ### TODO
-        pass
+        axis = self.axis1_
+        values = self.values_
+        n = self.length_
+
+        if start_x == end_x:
+            return 0.0
+        
+        
+        if end_x < axis[0]:
+            return float(values[0]*(end_x - start_x))
+        if start_x > axis[-1]:
+            return float(values[-1]*(end_x-start_x))
+        if start_x < axis[0]:
+            total = values[0]*(axis[0] - start_x)
+            for i in range(n-1):
+                if axis[i] <= end_x < axis[i+1]:
+                    total += values[i+1]*(end_x -axis[i])
+                    return float(total)
+                total+=values[i+1]*(axis[i+1]-axis[i])
+        
+            total += values[n-1]*(end_x-axis[n-1]) 
+            return float(total)
+        else:
+            total= 0.0
+            index4end = 0
+            for i in range(n-1):
+                if axis[i] <= start_x < axis[i + 1]:                
+                    if end_x <= axis[i + 1]:
+                        return float( values[i+1]*(end_x - start_x)),1
+                    total += values[i+1]*(axis[i + 1] - start_x)
+                    index4end = i+1
+                    break
+            for i in range(index4end,n-1):
+                if axis[i] <= end_x < axis[i+1]:
+                    total += values[i+1]*(end_x -axis[i])
+                    return float(total)
+                else:
+                    total+=values[i+1]*(axis[i+1]-axis[i])
+            
+            total += values[n-1]*(end_x-axis[n-1])
+
+            return float(total)
+        
+                
+                
+
+    def gradient_wrt_ordinate(self, x : float):
+        ### TODO
+        axis = self.axis1_
+        n = self.length_
+        grad = np.zeros(n)
+
+       
+        if x < axis[0]:
+            grad[0] = 1.0
+            return grad
+
+        for i in range(n - 1):
+            if axis[i] <= x < axis[i + 1]:
+                grad[i + 1] = 1.0
+                return grad
+
+        grad[n - 1] = 1.0
+        return grad
+        
 
     def gradient_of_integrated_value_wrt_ordinate(self, start_x : float, end_x : float):
         ### TODO
-        pass
+        
+        if start_x == end_x:
+            return np.zeros(self.length_)
+
+        sign = 1.0
+        if end_x < start_x:
+            start_x, end_x = end_x, start_x
+            sign = -1.0
+
+        axis = self.axis1_
+        n = self.length_
+        overlap = np.zeros(n)
+
+        # Left wing: 
+        if start_x < axis[0]:
+            left = start_x
+            right = min(end_x, axis[0])
+            if right > left:
+                overlap[0] = right - left
+
+        # Interior buckets: 
+        for i in range(n - 1):
+            left = max(start_x, axis[i])
+            right = min(end_x, axis[i + 1])
+            if right > left:
+                overlap[i + 1] += right - left
+
+        # Right wing: 
+        if end_x > axis[-1]:
+            left = max(start_x, axis[-1])
+            right = end_x
+            if right > left:
+                overlap[n - 1] += right - left
+
+        return overlap * sign   
 
 class InterpolatorFactory:
 
